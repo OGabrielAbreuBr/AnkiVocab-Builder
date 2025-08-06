@@ -1,0 +1,27 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    # Usa a imagem oficial do PostgreSQL
+    image: postgres:15-alpine
+    container_name: vocab-db
+
+    # Variáveis de ambiente para configurar o banco de dados
+    # Elas devem corresponder à sua DATABASE_URL
+    environment:
+      - POSTGRES_USER=usuario
+      - POSTGRES_PASSWORD=senha
+      - POSTGRES_DB=vocabdb
+    
+    # Mapeia a porta do container para a porta da sua máquina
+    # Formato: <porta_na_maquina>:<porta_no_container>
+    ports:
+      - "5432:5432"
+
+    # Garante que os dados do banco persistam mesmo se o container for removido
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -1,0 +1,18 @@
+fastapi
+uvicorn
+pydantic-settings>=0.1.0
+pydantic[email]
+sqlalchemy
+pandas
+gtts
+eng_to_ipa
+google-genai>=0.6.0
+google-api-core>=2.0.0
+genanki>=0.13.0
+SQLAlchemy>=2.0
+python-dotenv>=1.0.0
+psycopg2-binary      # Postgres
+asyncpg
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
