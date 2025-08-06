@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, MEDIA_BASE_URL } from './api.js';
 import { ui } from './ui.js';
 
 const state = {
@@ -7,6 +7,8 @@ const state = {
     currentDeck: null,
     languages: [],
 };
+
+const audioPlayer = new Audio();
 
 const router = {
     async handleRouteChange() {
@@ -36,11 +38,11 @@ const router = {
         
         if (hash.startsWith('#deck/')) {
             const deckId = parseInt(hash.split('/')[1], 10);
-            document.getElementById('content-area').innerHTML = '<p>A carregar deck...</p>';
+            document.getElementById('content-area').innerHTML = '<p class="text-center text-slate-500">A carregar deck...</p>';
             state.currentDeck = await api.getDeckById(deckId);
             ui.renderDeckView(state);
         } else if (hash === '#profile') {
-            document.getElementById('content-area').innerHTML = '<p>A carregar perfil...</p>';
+            document.getElementById('content-area').innerHTML = '<p class="text-center text-slate-500">A carregar perfil...</p>';
             ui.renderProfileView(state);
         } else {
             state.decks = await api.getDecks();
@@ -66,6 +68,7 @@ function setupEventListeners() {
         e.preventDefault();
         const form = e.target;
         const errorDiv = document.getElementById('login-error');
+        errorDiv.classList.add('hidden');
         try {
             const data = await api.login(form.email.value, form.password.value);
             document.cookie = `auth_token=${data.access_token}; path=/; max-age=3600`;
@@ -81,6 +84,7 @@ function setupEventListeners() {
         e.preventDefault();
         const form = e.target;
         const errorDiv = document.getElementById('signup-error');
+        errorDiv.classList.add('hidden');
         try {
             await api.signup(
                 form.firstname.value,
@@ -115,45 +119,40 @@ function setupEventListeners() {
     document.getElementById('new-deck-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
+        const errorDiv = document.getElementById('modal-error');
+        errorDiv.classList.add('hidden');
         try {
             await api.createDeck(form['deck-name'].value, form['deck-word-lang'].value, form['deck-expl-lang'].value);
             document.getElementById('new-deck-modal').classList.add('hidden');
             form.reset();
             await router.handleRouteChange();
         } catch (err) {
-            document.getElementById('modal-error').textContent = err.message;
-            document.getElementById('modal-error').classList.remove('hidden');
+            errorDiv.textContent = err.message;
+            errorDiv.classList.remove('hidden');
         }
     });
 
-    // --- CORREÇÃO PRINCIPAL AQUI ---
-    // Adicionamos um "ouvinte" para o evento de SUBMISSÃO na área de conteúdo.
-    document.getElementById('content-area').addEventListener('submit', async (e) => {
-        // Verificamos se o evento veio do formulário de adicionar palavra
-        if (e.target.id === 'add-word-form') {
-            e.preventDefault();
-            const form = e.target;
-            const wordInput = form.word;
-            const errorDiv = document.getElementById('add-word-error');
-            errorDiv.textContent = '';
-            errorDiv.classList.add('hidden');
-
-            try {
-                const newCard = await api.addWordToDeck(state.currentDeck.id, wordInput.value);
-                state.currentDeck.cards.push(newCard);
-                ui.renderDeckView(state); // Re-renderiza a vista do deck com a nova palavra
-                form.reset(); // Limpa o campo de input
-            } catch (err) {
-                errorDiv.textContent = err.message;
-                errorDiv.classList.remove('hidden');
-            }
-        }
-    });
-
-    // O "ouvinte" de CLIQUE lida com os botões (apagar, editar, etc.)
-    document.getElementById('app').addEventListener('click', async (e) => {
+    // --- OUVINTE DE EVENTOS GLOBAL CORRIGIDO ---
+    document.body.addEventListener('click', async (e) => {
         const target = e.target;
 
+        // Lógica para tocar áudio (com a sua sugestão de normalização)
+        const playBtn = target.closest('[data-audio-src]');
+        if (playBtn) {
+            const rawSrc = playBtn.dataset.audioSrc;
+            console.log('🔊 Play:', rawSrc);
+
+            const base = MEDIA_BASE_URL.replace(/\/$/, ''); // Tira a barra do fim
+            const path = rawSrc.replace(/^\//, '');      // Tira a barra do início
+            const url = `${base}/${path}`;
+            
+            console.log('URL do Áudio →', url);
+            audioPlayer.src = url;
+            audioPlayer.play().catch(err => console.error('Erro ao tocar áudio:', err));
+            return;
+        }
+
+        // Lógica para apagar deck
         const deleteDeckBtn = target.closest('[data-delete-deck-id]');
         if (deleteDeckBtn) {
             const deckId = deleteDeckBtn.dataset.deleteDeckId;
@@ -165,6 +164,7 @@ function setupEventListeners() {
             return;
         }
 
+        // Lógica para editar card
         const editCardBtn = target.closest('[data-edit-card]');
         if (editCardBtn) {
             const card = JSON.parse(editCardBtn.dataset.editCard);
@@ -176,6 +176,7 @@ function setupEventListeners() {
             return;
         }
 
+        // Lógica para apagar card
         const deleteCardBtn = target.closest('[data-delete-card]');
         if (deleteCardBtn) {
             const cardId = parseInt(deleteCardBtn.dataset.deleteCard, 10);
@@ -187,10 +188,7 @@ function setupEventListeners() {
     });
 
     // Listeners para os modais
-    document.getElementById('cancel-delete-deck-btn').addEventListener('click', () => {
-        document.getElementById('confirm-delete-deck-modal').classList.add('hidden');
-    });
-
+    document.getElementById('cancel-delete-deck-btn').addEventListener('click', () => document.getElementById('confirm-delete-deck-modal').classList.add('hidden'));
     document.getElementById('confirm-delete-deck-btn').addEventListener('click', async () => {
         const modal = document.getElementById('confirm-delete-deck-modal');
         const deckId = modal.dataset.deckId;
@@ -199,11 +197,7 @@ function setupEventListeners() {
         window.location.hash = '#';
         await router.handleRouteChange();
     });
-
-    document.getElementById('cancel-edit-card-btn').addEventListener('click', () => {
-        document.getElementById('edit-card-modal').classList.add('hidden');
-    });
-
+    document.getElementById('cancel-edit-card-btn').addEventListener('click', () => document.getElementById('edit-card-modal').classList.add('hidden'));
     document.getElementById('edit-card-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -217,6 +211,7 @@ function setupEventListeners() {
         await router.handleRouteChange();
     });
     
+    // Listener para os formulários
     document.body.addEventListener('submit', async (e) => {
         if (e.target.id === 'profile-form') {
             e.preventDefault();
@@ -229,6 +224,21 @@ function setupEventListeners() {
             state.user = updatedUser;
             ui.renderHeader(state);
             alert('Perfil atualizado com sucesso!');
+        } else if (e.target.id === 'add-word-form') {
+            e.preventDefault();
+            const form = e.target;
+            const wordInput = form.word;
+            const errorDiv = document.getElementById('add-word-error');
+            errorDiv.classList.add('hidden');
+            try {
+                const newCard = await api.addWordToDeck(state.currentDeck.id, wordInput.value);
+                state.currentDeck.cards.push(newCard);
+                ui.renderDeckView(state);
+                form.reset();
+            } catch (err) {
+                errorDiv.textContent = err.message;
+                errorDiv.classList.remove('hidden');
+            }
         }
     });
 }

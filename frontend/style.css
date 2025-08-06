@@ -1,13 +1,16 @@
+/* Estilo base para a fonte e transições suaves */
 body {
     font-family: 'Inter', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Esconde todas as "páginas" por defeito */
 .view {
     display: none;
 }
 
+/* Mostra apenas a "página" ativa */
 .view.active {
     display: block;
 }

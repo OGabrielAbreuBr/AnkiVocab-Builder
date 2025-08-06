@@ -25,7 +25,6 @@ class User(Base):
     user_decks      = relationship("UserDeck",    back_populates="user",     cascade="all, delete-orphan")
     user_languages  = relationship("UserLanguage",back_populates="user",     cascade="all, delete-orphan")
 
-    # --- CORREÇÃO AQUI ---
     # Relações de conveniência, apenas para leitura (viewonly=True)
     decks           = relationship("Deck",        secondary="user_decks",    back_populates="users", viewonly=True)
     languages       = relationship("Language",    secondary="user_languages",back_populates="users", viewonly=True)
