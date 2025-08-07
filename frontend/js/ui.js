@@ -89,7 +89,14 @@ export const ui = {
         `}).join('');
 
         document.getElementById('content-area').innerHTML = `
-            <a href="#" class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6">&larr; Voltar para todos os decks</a>
+            <div class="flex justify-between items-center mb-6">
+                <a href="#" class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900">&larr; Voltar para todos os decks</a>
+                <!-- BOTÃO DE EXPORTAR -->
+                <button id="export-anki-btn" class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Exportar para Anki
+                </button>
+            </div>
             <h1 class="text-4xl font-bold text-slate-900 tracking-tight mb-8">${deck.name}</h1>
             <div class="mb-10 p-6 bg-white rounded-xl shadow-md border border-slate-200">
                 <h2 class="text-xl font-semibold mb-2">Adicionar Nova Palavra</h2>
@@ -103,27 +110,62 @@ export const ui = {
             <div class="space-y-4">${cardsHtml.length > 0 ? cardsHtml : '<p class="text-slate-500">Ainda não há palavras neste deck.</p>'}</div>
         `;
     },
-
+    
     renderProfileView(state) {
         const contentArea = document.getElementById('content-area');
-        if (!state.user) {
-            contentArea.innerHTML = `<p>Utilizador não encontrado.</p>`;
+        if (!state.user || !state.languages) {
+            contentArea.innerHTML = `<p>A carregar dados do perfil...</p>`;
             return;
         }
+
+        // Cria um conjunto com os IDs dos idiomas que o utilizador já tem
+        const userLangIds = new Set(state.user.languages.map(lang => lang.language_id));
+
+        // Gera o HTML para cada checkbox de idioma
+        const languagesHtml = state.languages.map(lang => `
+            <div class="flex items-center">
+                <input 
+                    id="lang-${lang.id}" 
+                    name="languages" 
+                    type="checkbox" 
+                    value="${lang.id}"
+                    ${userLangIds.has(lang.id) ? 'checked' : ''}
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                >
+                <label for="lang-${lang.id}" class="ml-3 block text-sm text-gray-900">
+                    ${lang.name}
+                </label>
+            </div>
+        `).join('');
+
         contentArea.innerHTML = `
             <a href="#" class="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6">&larr; Voltar para os decks</a>
             <h1 class="text-4xl font-bold text-slate-900 mb-8">Meu Perfil</h1>
-            <form id="profile-form" class="space-y-6 bg-white p-8 rounded-xl shadow-md">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label for="profile-firstname" class="block text-sm font-medium text-slate-600">Nome</label>
-                        <input id="profile-firstname" type="text" value="${state.user.first_name}" class="w-full mt-1 p-2 border rounded-md">
-                    </div>
-                    <div>
-                        <label for="profile-lastname" class="block text-sm font-medium text-slate-600">Apelido</label>
-                        <input id="profile-lastname" type="text" value="${state.user.last_name}" class="w-full mt-1 p-2 border rounded-md">
+            
+            <form id="profile-form" class="space-y-8 bg-white p-8 rounded-xl shadow-md">
+                <!-- Secção de Dados Pessoais -->
+                <div class="space-y-6">
+                    <h2 class="text-xl font-semibold text-slate-800 border-b pb-2">Dados Pessoais</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="profile-firstname" class="block text-sm font-medium text-slate-600">Nome</label>
+                            <input id="profile-firstname" type="text" value="${state.user.first_name}" class="w-full mt-1 p-2 border rounded-md">
+                        </div>
+                        <div>
+                            <label for="profile-lastname" class="block text-sm font-medium text-slate-600">Apelido</label>
+                            <input id="profile-lastname" type="text" value="${state.user.last_name}" class="w-full mt-1 p-2 border rounded-md">
+                        </div>
                     </div>
                 </div>
+
+                <!-- Secção de Idiomas -->
+                <div class="space-y-4">
+                    <h2 class="text-xl font-semibold text-slate-800 border-b pb-2">Meus Idiomas</h2>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        ${languagesHtml}
+                    </div>
+                </div>
+
                 <div class="pt-4 text-right">
                     <button type="submit" class="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg">Salvar Alterações</button>
                 </div>

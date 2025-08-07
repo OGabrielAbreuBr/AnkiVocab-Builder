@@ -2,7 +2,7 @@
 
 from typing import List, Optional
 from fastapi import HTTPException, status
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 from core.security import get_password_hash
 from db.models import (
     User, Language, Word, Audio, Image,
-    Deck, DeckWord, UserDeck
+    Deck, DeckWord, UserDeck, UserLanguage
 )
 from schemas.user import UserCreate, UserUpdate
 from schemas.decks import CardUpdate
@@ -76,6 +76,20 @@ async def update_user(db: AsyncSession, user: User, user_in: UserUpdate) -> User
     await db.refresh(user)
     return user
 
+async def update_user_languages(db: AsyncSession, user_id: int, language_ids: List[int]):
+    """
+    Atualiza a lista de idiomas associados a um utilizador.
+    Primeiro apaga as associações antigas e depois cria as novas.
+    """
+    # Apaga as associações existentes
+    await db.execute(delete(UserLanguage).where(UserLanguage.user_id == user_id))
+    
+    # Cria as novas associações
+    new_associations = [UserLanguage(user_id=user_id, language_id=lang_id) for lang_id in language_ids]
+    if new_associations:
+        db.add_all(new_associations)
+    
+    await db.commit()
 
 # --- LANGUAGES ---
 
@@ -162,12 +176,15 @@ async def create_or_update_audio(
     db: AsyncSession,
     word_id: int,
     path: str,
-    audio_type: str, # 'word', 'meaning', ou 'example'
+    audio_type: str,
     format: str = "mp3",
     duration: Optional[float] = None
 ) -> Audio:
-    """Cria ou atualiza um registo de áudio específico para uma palavra."""
-    # Procura por um áudio existente com base no word_id e no audio_type
+    """
+    Cria ou atualiza um registo de áudio específico para uma palavra.
+    Esta função faz um "upsert": se o áudio para esta palavra e tipo já existir,
+    atualiza o seu caminho. Se não existir, cria um novo registo.
+    """
     stmt = select(Audio).where(Audio.word_id == word_id, Audio.audio_type == audio_type)
     result = await db.execute(stmt)
     audio = result.scalars().first()

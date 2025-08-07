@@ -2,7 +2,7 @@ const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 export const MEDIA_BASE_URL = 'http://127.0.0.1:8000/media/';
 
 export const api = {
-    async fetcher(endpoint, options = {}) {
+    async fetcher(endpoint, options = {}, isBlob = false) {
         const token = document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
         const headers = { 'Content-Type': 'application/json', ...options.headers };
         if (token) {
@@ -12,6 +12,9 @@ export const api = {
         if (!response.ok) {
             const errorInfo = await response.json();
             throw new Error(errorInfo.detail || 'Erro na API');
+        }
+        if (isBlob) {
+            return response.blob(); // Retorna o ficheiro como um blob
         }
         return response.status === 204 ? null : response.json();
     },
@@ -50,4 +53,7 @@ export const api = {
         body: JSON.stringify(userData)
     }),
     deleteCardFromDeck: (deckId, cardId) => api.fetcher(`/decks/${deckId}/cards/${cardId}`, { method: 'DELETE' }),
+    
+    // --- NOVA FUNÇÃO ---
+    exportAnkiDeck: (deckId) => api.fetcher(`/anki/export/${deckId}`, {}, true),
 };

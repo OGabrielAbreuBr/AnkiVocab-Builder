@@ -1,10 +1,10 @@
 # app/api/endpoints/users.py
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api import deps
 from db import crud, models
-from schemas.user import UserCreate, UserOut, UserUpdate
+from schemas.user import UserCreate, UserOut, UserUpdate, UserLanguagesUpdate
 from db.models import User
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -38,3 +38,15 @@ async def update_user_me(
 ):
     """Atualiza o perfil do utilizador logado."""
     return await crud.update_user(db, user=current_user, user_in=user_in)
+
+@router.put("/me/languages", status_code=status.HTTP_204_NO_CONTENT)
+async def update_my_languages(
+    payload: UserLanguagesUpdate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_user: models.User = Depends(deps.get_current_user),
+):
+    """
+    Atualiza a lista de idiomas que o utilizador estuda.
+    """
+    await crud.update_user_languages(db, user_id=current_user.id, language_ids=payload.language_ids)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

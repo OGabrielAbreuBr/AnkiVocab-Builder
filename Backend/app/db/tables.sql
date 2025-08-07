@@ -1,6 +1,6 @@
 -- Entidades Fortes
 
-CREATE TABLE User (
+CREATE TABLE users (
   id               SERIAL PRIMARY KEY,
   first_name       VARCHAR(100)   NOT NULL,
   last_name        VARCHAR(255)   NOT NULL,
@@ -11,13 +11,13 @@ CREATE TABLE User (
   updated_at       TIMESTAMP      NOT NULL DEFAULT now()
 );
 
-CREATE TABLE Languages (
+CREATE TABLE languages (
   id               SERIAL PRIMARY KEY,
   code             VARCHAR(10)    NOT NULL UNIQUE,
   name             VARCHAR(50)    NOT NULL
 );
 
-CREATE TABLE DLanguageeck (
+CREATE TABLE decks (
   id                       SERIAL PRIMARY KEY,
   name                     VARCHAR(255) NOT NULL,
   is_public                BOOLEAN      NOT NULL DEFAULT FALSE,
@@ -31,7 +31,7 @@ CREATE TABLE DLanguageeck (
     ON UPDATE CASCADE ON DELETE RESTRICT
 );
 
-CREATE TABLE Word (
+CREATE TABLE words (
   id            SERIAL PRIMARY KEY,
   text          VARCHAR(100) NOT NULL,
   meaning       TEXT         NOT NULL,
@@ -49,20 +49,19 @@ CREATE TABLE Word (
 
 -- Entidades Fracas
 
-CREATE TABLE Audio (
-  word_id       INTEGER    NOT NULL
+CREATE TABLE audio (
+  word_id       INTEGER    PRIMARY KEY
                    REFERENCES words(id)
                    ON UPDATE CASCADE ON DELETE CASCADE,
   format        VARCHAR(10) NOT NULL,
   path          VARCHAR(255) NOT NULL,
   duration_secs REAL,
   created_at    TIMESTAMP    NOT NULL DEFAULT now(),
-  updated_at    TIMESTAMP    NOT NULL DEFAULT now(),
-  PRIMARY KEY (word_id)
+  updated_at    TIMESTAMP    NOT NULL DEFAULT now()
 );
 
-CREATE TABLE Images (
-  word_id      INTEGER     NOT NULL
+CREATE TABLE images (
+  word_id      INTEGER     PRIMARY KEY
                   REFERENCES words(id)
                   ON UPDATE CASCADE ON DELETE CASCADE,
   image_type   VARCHAR(50) NOT NULL,
@@ -70,13 +69,13 @@ CREATE TABLE Images (
   format       VARCHAR(10)  NOT NULL,
   creator      VARCHAR(255),
   created_at   TIMESTAMP     NOT NULL DEFAULT now(),
-  updated_at   TIMESTAMP     NOT NULL DEFAULT now(),
-  PRIMARY KEY (word_id)
+  updated_at   TIMESTAMP     NOT NULL DEFAULT now()
 );
+
 
 -- Relacionamentos M:N (tabelas de junção)
 
-CREATE TABLE User_decks (
+CREATE TABLE user_decks (
   user_id  INTEGER NOT NULL
              REFERENCES users(id)
              ON UPDATE CASCADE ON DELETE CASCADE,
@@ -86,7 +85,7 @@ CREATE TABLE User_decks (
   PRIMARY KEY (user_id, deck_id)
 );
 
-CREATE TABLE User_languages (
+CREATE TABLE user_languages (
   user_id     INTEGER NOT NULL
                 REFERENCES users(id)
                 ON UPDATE CASCADE ON DELETE CASCADE,
@@ -96,7 +95,7 @@ CREATE TABLE User_languages (
   PRIMARY KEY (user_id, language_id)
 );
 
-CREATE TABLE eck_words (
+CREATE TABLE deck_words (
   deck_id  INTEGER NOT NULL
              REFERENCES decks(id)
              ON UPDATE CASCADE ON DELETE CASCADE,

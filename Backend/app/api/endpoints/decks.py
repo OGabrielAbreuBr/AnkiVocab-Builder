@@ -65,32 +65,57 @@ async def add_card(
     current_user: models.User = Depends(deps.get_current_user),
 ):
     """
-    Adiciona um novo card (palavra) a um deck existente, incluindo a geração e o registo de áudio.
+    Adiciona um novo card (palavra) a um deck existente de forma robusta.
     """
+    # Validação do Deck e Permissão
     deck = await crud.get_deck_by_id(db, deck_id=deck_id)
     if not deck or current_user not in deck.users:
-        raise HTTPException(status_code=404, detail="Deck não encontrado ou sem permissão")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Deck não encontrado ou sem permissão"
+        )
 
-    # Gera todos os dados da palavra
-    meaning, example = gerar_meaning_example(payload.word)
-    cefr = gerar_cefr(payload.word)
-    phonetic = transcribe_phonetics(payload.word)
+    # Geração de Dados da Palavra, passando os nomes dos idiomas
+    try:
+        meaning, example = gerar_meaning_example(
+            palavra=payload.word,
+            word_language_name=deck.word_language.name,
+            explanation_language_name=deck.explanation_language.name
+        )
+        cefr = gerar_cefr(
+            palavra=payload.word,
+            word_language_name=deck.word_language.name
+        )
+        phonetic = transcribe_phonetics(payload.word)
+    except Exception as e:
+        print(f"ERRO CRÍTICO ao gerar dados da IA para '{payload.word}': {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"O serviço de IA falhou ao processar a palavra. Tente novamente mais tarde."
+        )
 
     if not meaning or not cefr:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="Não foi possível gerar os dados essenciais.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Não foi possível gerar os dados essenciais (significado, CEFR) para a palavra."
+        )
 
-    # Guarda a palavra principal na base de dados
+    # Salvar a Palavra Principal no Banco de Dados
     word_obj = await crud.get_or_create_word(
-        db=db, text=payload.word, meaning=meaning, example=example,
-        cefr=cefr, phonetic=phonetic, language_id=deck.language_word_id
+        db=db,
+        text=payload.word,
+        meaning=meaning,
+        example=example,
+        cefr=cefr,
+        phonetic=phonetic,
+        language_id=deck.language_word_id
     )
 
-    # Gera os três ficheiros de áudio
+    # Geração e Salvamento de Mídia
     audio_word_file = gerar_audio_palavra(payload.word, lang_code=deck.word_language.code)
     audio_meaning_file = gerar_audio_meaning(payload.word, meaning, lang_code=deck.explanation_language.code)
     audio_example_file = gerar_audio_example(payload.word, example, lang_code=deck.word_language.code)
     
-    # Salva cada registo de áudio na base de dados, especificando o seu tipo
     if audio_word_file:
         await crud.create_or_update_audio(db, word_id=word_obj.id, path=audio_word_file, audio_type='word')
     if audio_meaning_file:
@@ -98,8 +123,13 @@ async def add_card(
     if audio_example_file:
         await crud.create_or_update_audio(db, word_id=word_obj.id, path=audio_example_file, audio_type='example')
 
-    # Apenas liga a palavra ao deck
-    return await crud.add_card_to_deck(db=db, deck_id=deck.id, word_id=word_obj.id)
+    # Ligar a Palavra ao Deck
+    return await crud.add_card_to_deck(
+        db=db,
+        deck_id=deck.id,
+        word_id=word_obj.id,
+    )
+
 
 @router.put("/{deck_id}/cards/{card_id}", response_model=CardOut)
 async def update_card_in_deck(
@@ -109,17 +139,46 @@ async def update_card_in_deck(
     db: AsyncSession = Depends(deps.get_db),
     current_user: models.User = Depends(deps.get_current_user),
 ):
-    """Atualiza o significado ou exemplo de uma palavra num card."""
+    """
+    Atualiza o significado ou exemplo de uma palavra num card e regenera os áudios.
+    """
+    # 1. Validação para garantir que o utilizador é dono do deck
     deck = await crud.get_deck_by_id(db, deck_id=deck_id)
     if not deck or current_user not in deck.users:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Deck não encontrado")
+        raise HTTPException(status_code=404, detail="Deck não encontrado")
 
     card = await db.get(models.DeckWord, card_id)
     if not card or card.deck_id != deck_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Card não encontrado neste deck")
+        raise HTTPException(status_code=404, detail="Card não encontrado neste deck")
 
-    await crud.update_word(db, word_id=card.word_id, card_in=card_in)
+    # 2. Atualiza o texto (meaning e example) na tabela 'words'
+    updated_word = await crud.update_word(db, word_id=card.word_id, card_in=card_in)
     
+    # --- CORREÇÃO PRINCIPAL AQUI ---
+    # 3. Regenera os ficheiros de áudio com o novo texto
+    if card_in.meaning:
+        audio_meaning_file = gerar_audio_meaning(
+            palavra=updated_word.text, 
+            meaning=card_in.meaning, 
+            lang_code=deck.explanation_language.code
+        )
+        # 4. Salva o novo caminho na tabela 'audio'
+        await crud.create_or_update_audio(
+            db, word_id=updated_word.id, path=audio_meaning_file, audio_type='meaning'
+        )
+
+    if card_in.example:
+        audio_example_file = gerar_audio_example(
+            palavra=updated_word.text, 
+            example=card_in.example, 
+            lang_code=deck.word_language.code
+        )
+        await crud.create_or_update_audio(
+            db, word_id=updated_word.id, path=audio_example_file, audio_type='example'
+        )
+    # --- FIM DA CORREÇÃO ---
+
+    # 5. Recarrega o card para devolver a resposta completa e atualizada
     await db.refresh(card, attribute_names=['word'])
     return card
 

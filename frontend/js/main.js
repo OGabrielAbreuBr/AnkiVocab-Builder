@@ -43,8 +43,15 @@ const router = {
             ui.renderDeckView(state);
         } else if (hash === '#profile') {
             document.getElementById('content-area').innerHTML = '<p class="text-center text-slate-500">A carregar perfil...</p>';
+            // Garante que a lista completa de idiomas está disponível
+            if (state.languages.length === 0) {
+                state.languages = await api.getLanguages();
+            }
+            // Garante que os dados do utilizador estão atualizados com as suas línguas
+            state.user = await api.getCurrentUser();
             ui.renderProfileView(state);
         } else {
+            // Rota principal (dashboard)
             state.decks = await api.getDecks();
             ui.renderHeader(state);
             ui.renderDashboard(state);
@@ -132,27 +139,19 @@ function setupEventListeners() {
         }
     });
 
-    // --- OUVINTE DE EVENTOS GLOBAL CORRIGIDO ---
-    document.body.addEventListener('click', async (e) => {
+    document.getElementById('app').addEventListener('click', async (e) => {
         const target = e.target;
 
-        // Lógica para tocar áudio (com a sua sugestão de normalização)
         const playBtn = target.closest('[data-audio-src]');
         if (playBtn) {
-            const rawSrc = playBtn.dataset.audioSrc;
-            console.log('🔊 Play:', rawSrc);
-
-            const base = MEDIA_BASE_URL.replace(/\/$/, ''); // Tira a barra do fim
-            const path = rawSrc.replace(/^\//, '');      // Tira a barra do início
-            const url = `${base}/${path}`;
-            
-            console.log('URL do Áudio →', url);
-            audioPlayer.src = url;
-            audioPlayer.play().catch(err => console.error('Erro ao tocar áudio:', err));
+            const audioSrc = playBtn.dataset.audioSrc;
+            if (audioSrc) {
+                audioPlayer.src = `${MEDIA_BASE_URL}${audioSrc}`;
+                audioPlayer.play().catch(err => console.error("Erro ao tocar áudio:", err));
+            }
             return;
         }
 
-        // Lógica para apagar deck
         const deleteDeckBtn = target.closest('[data-delete-deck-id]');
         if (deleteDeckBtn) {
             const deckId = deleteDeckBtn.dataset.deleteDeckId;
@@ -164,7 +163,6 @@ function setupEventListeners() {
             return;
         }
 
-        // Lógica para editar card
         const editCardBtn = target.closest('[data-edit-card]');
         if (editCardBtn) {
             const card = JSON.parse(editCardBtn.dataset.editCard);
@@ -176,7 +174,6 @@ function setupEventListeners() {
             return;
         }
 
-        // Lógica para apagar card
         const deleteCardBtn = target.closest('[data-delete-card]');
         if (deleteCardBtn) {
             const cardId = parseInt(deleteCardBtn.dataset.deleteCard, 10);
@@ -187,8 +184,10 @@ function setupEventListeners() {
         }
     });
 
-    // Listeners para os modais
-    document.getElementById('cancel-delete-deck-btn').addEventListener('click', () => document.getElementById('confirm-delete-deck-modal').classList.add('hidden'));
+    document.getElementById('cancel-delete-deck-btn').addEventListener('click', () => {
+        document.getElementById('confirm-delete-deck-modal').classList.add('hidden');
+    });
+
     document.getElementById('confirm-delete-deck-btn').addEventListener('click', async () => {
         const modal = document.getElementById('confirm-delete-deck-modal');
         const deckId = modal.dataset.deckId;
@@ -197,7 +196,11 @@ function setupEventListeners() {
         window.location.hash = '#';
         await router.handleRouteChange();
     });
-    document.getElementById('cancel-edit-card-btn').addEventListener('click', () => document.getElementById('edit-card-modal').classList.add('hidden'));
+
+    document.getElementById('cancel-edit-card-btn').addEventListener('click', () => {
+        document.getElementById('edit-card-modal').classList.add('hidden');
+    });
+
     document.getElementById('edit-card-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -211,7 +214,6 @@ function setupEventListeners() {
         await router.handleRouteChange();
     });
     
-    // Listener para os formulários
     document.body.addEventListener('submit', async (e) => {
         if (e.target.id === 'profile-form') {
             e.preventDefault();
@@ -222,6 +224,12 @@ function setupEventListeners() {
             };
             const updatedUser = await api.updateUserProfile(userData);
             state.user = updatedUser;
+
+            const selectedLangIds = Array.from(form.languages)
+                                         .filter(checkbox => checkbox.checked)
+                                         .map(checkbox => parseInt(checkbox.value, 10));
+            await api.updateUserLanguages(selectedLangIds);
+
             ui.renderHeader(state);
             alert('Perfil atualizado com sucesso!');
         } else if (e.target.id === 'add-word-form') {
